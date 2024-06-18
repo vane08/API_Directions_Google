@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Resolver el problema VRP</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            display: flex;
+            height: 100%;
+        }
+        #form-container {
+            width: 35%;
+            padding: 20px;
+            background-color: #c5d9ed ;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+        }
+        #map-container {
+            width: 65%;
+            height: 100%;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        .centered-title {
+            text-align: center;
+            font-weight: bold;
+        }
+        .form-control {
+            background-color: #c5d9ed;
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAgIwoNsnI4JVgb-jGacBcRLiOd9JMLtRs&libraries=places"></script>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+</head>
+<body>
+    <div id="container">
+        <div id="form-container">
+            <div id="inputs" class="card">
+                <div class="card-body">
+                    <h5 class="card-title centered-title">Proyecto Final</h5>
+                    <div class="form-group">
+                        <label for="origin">Origen</label>
+                        <input id="origin" type="text" class="form-control" placeholder="Origen">
+                    </div>
+                    <div class="form-group">
+                        <label for="destination">Destino Final</label>
+                        <input id="destination" type="text" class="form-control" placeholder="Destino final">
+                    </div>
+                    <div class="form-row">
+                        <div class="col">
+                            <div class="form-group">
+                                <label for="num_waypoints">Número de paradas</label>
+                                <input id="num_waypoints" type="number" class="form-control" placeholder="Núm. de paradas" min="0">
+                            </div>
+                        </div>
+                        <div class="col">
+                            <button onclick="generateWaypointInputs()" class="btn btn-dark mt-4">Generar campos</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="travel_mode">Modo de Viaje</label>
+                        <select id="travel_mode" class="form-control">
+                            <option value="DRIVING">Carro</option>
+                            <option value="BICYCLING">Bicicleta</option>
+                            <option value="WALKING">Caminando</option>
+                        </select>
+                    </div>
+                    <div id="waypoint_inputs" class="form-group"></div>
+                    <button onclick="calculateRoute()" class="btn btn-dark">Calcular Ruta</button>
+                </div>
+            </div>
+            <div id="results" class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title centered-title">Resultados</h5>
+                    <p id="distance" class="card-text"></p>
+                    <p id="duration" class="card-text"></p>
+                    <p id="fuel_cost" class="card-text"></p>
+                    <p id="toll_cost" class="card-text"></p>
+                    <p id="total_cost" class="card-text"></p>
+                </div>
+            </div>
+        </div>
+        <div id="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+    <script>
+        let map;
+        let directionsService;
+        let directionsRenderer;
+        let autocompleteOrigin;
+        let autocompleteDestination;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 6,
+                center: {lat: 19.432608, lng: -99.133209} // Ciudad de México
+            });
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                map: map
+            });
+
+            autocompleteOrigin = new google.maps.places.Autocomplete(document.getElementById('origin'), {
+                types: ['geocode']
+            });
+            autocompleteDestination = new google.maps.places.Autocomplete(document.getElementById('destination'), {
+                types: ['geocode']
+            });
+        }
+
+        function generateWaypointInputs() {
+            const numWaypoints = document.getElementById('num_waypoints').value;
+            const waypointContainer = document.getElementById('waypoint_inputs');
+            waypointContainer.innerHTML = '';
+
+            for (let i = 0; i < numWaypoints; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-control mb-2';
+                input.placeholder = `Parada ${i + 1}`;
+                input.id = `waypoint${i + 1}`;
+                waypointContainer.appendChild(input);
+
+                // Initialize autocomplete for each waypoint input
+                new google.maps.places.Autocomplete(input, {
+                    types: ['geocode']
+                });
+            }
+        }
+
+        function calculateRoute() {
+            const origin = document.getElementById('origin').value;
+            const destination = document.getElementById('destination').value;
+            const numWaypoints = document.getElementById('num_waypoints').value;
+            const travelMode = document.getElementById('travel_mode').value;
+
+            waypointsData = [];
+            const waypoints = [];
+            for (let i = 0; i < numWaypoints; i++) {
+                const waypoint = document.getElementById(`waypoint${i + 1}`).value;
+                if (waypoint) {
+                    waypoints.push({ location: waypoint, stopover: true });
+                    waypointsData.push(waypoint);
+                }
+            }
+
+            const request = {
+                origin: origin,
+                destination: destination,
+                waypoints: waypoints,
+                travelMode: travelMode
+            };
+
+            directionsService.route(request, function(result, status) {
+                if (status == 'OK') {
+                    directionsRenderer.setDirections(result);
+
+                    const totalDistance = result.routes[0].legs.reduce((sum, leg) => sum + leg.distance.value, 0) / 1000;  // en kilómetros
+                    const totalDuration = result.routes[0].legs.reduce((sum, leg) => sum + leg.duration.value, 0);  // en segundos
+                    const totalHours = Math.floor(totalDuration / 3600);
+                    const totalMinutes = Math.floor((totalDuration % 3600) / 60);
+
+                    fetch('/get_directions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            origin: origin,
+                            destination: destination,
+                            waypoints: waypoints.map(wp => wp.location),
+                            total_distance: totalDistance,
+                            total_duration: totalDuration,
+                            travel_mode: travelMode
+                        })
+                    }).then(response => response.json())
+                      .then(data => {
+                          document.getElementById('distance').innerText = `Distancia total: ${data.total_distance.toFixed(2)} km`;
+                          document.getElementById('duration').innerText = `Duración total: ${totalHours} horas y ${totalMinutes} minutos`;
+                          document.getElementById('fuel_cost').innerText = `Costo total de la gasolina: $${data.total_fuel_cost.toFixed(2)}`;
+                          document.getElementById('toll_cost').innerText = `Costo total de las casetas: $${data.total_toll_cost.toFixed(2)}`;
+                          document.getElementById('total_cost').innerText = `Costo total del viaje: $${data.total_trip_cost.toFixed(2)}`;
+                      })
+                      .catch(error => console.error('Error:', error));
+                } else {
+                    console.error('Error: ' + status);
+                }
+            });
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>
